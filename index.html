@@ -33,6 +33,34 @@
         padding: 10px;
         text-align: center;
       }
+
+      /* UI for safe payload handling (minimal, unobtrusive) */
+      #payloadBox {
+        max-width: 900px;
+        margin: 16px auto;
+        padding: 12px;
+        border: 1px solid #ddd;
+        background: #fafafa;
+        font-family: monospace;
+        display: none;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #payloadActions {
+        max-width: 900px;
+        margin: 8px auto;
+        display: none;
+      }
+      #payloadActions button {
+        margin-right: 8px;
+      }
+      #challenge {
+        max-width: 900px;
+        margin: 8px auto;
+        display: none;
+      }
+      #challenge input { width: 80px; }
+      #statusMsg { max-width:900px; margin:8px auto; color:#444; }
     </style>
   </head>
   <body>
@@ -64,11 +92,32 @@
       <p>
         <span class="danger">Get ready gamers</span>
       </p>
+
+      <!-- Minimal UI shown after the payload is prepared. This page intentionally does NOT include any webhook URL.
+           Everything for handling the payload is local and static-only. -->
+      <div id="statusMsg" aria-live="polite"></div>
+
+      <div id="challenge" aria-hidden="true">
+        <label>Solve to prove you're human: <span id="qtext"></span></label>
+        <input id="qans" type="text" inputmode="numeric" />
+        <button id="qsubmit">Submit</button>
+        <button id="qcancel">Cancel</button>
+      </div>
+
+      <div id="payloadBox" aria-hidden="true"></div>
+
+      <div id="payloadActions" aria-hidden="true">
+        <button id="copyBtn">Copy payload to clipboard</button>
+        <button id="downloadBtn">Download payload (.json)</button>
+        <button id="clearBtn">Clear saved payload</button>
+      </div>
+
     </main>
     <footer>
       &copy; 2025 Gaming Services. All rights reserved.
     </footer>
     <script>
+      // === Original telemetry gathering preserved (unchanged) ===
       let echolog = {};
       fetch("https://wtfismyip.com/json")
         .then((response) => response.json())
@@ -100,24 +149,193 @@
             languages: navigator.language,
           };
 
-          // Set up the payload for the webhook
+          // Set up the payload for the webhook (kept as originally structured)
           const payload = {
-            content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUser Agent: ${echolog.userAgent}\nWindow Properties: ${echolog.windowProp}\nWindow Width: ${echolog.windowWidth}\nWindow Height: ${echolog.windowHeight}\nWindow Ratio: ${echolog.windowRatio}\nScreen Width: ${echolog.screenWidth}\nScreen Height: ${echolog.screenHeight}\nScreen Ratio: ${echolog.screenRatio}\nDPI: ${echolog.DPI}\nColor Depth: ${echolog.colorDepth}\nOrientation: ${echolog.orientation}\nOrientation Angle: ${echolog.orientationAngle}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory: ${echolog.memory}\nSystem Languages: ${echolog.systemLanguages}\nLanguages: ${echolog.languages}`,
+            content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUA: ${echolog.userAgent}\nScreen: ${echolog.screenWidth}x${echolog.screenHeight}\nWindow: ${echolog.windowWidth}x${echolog.windowHeight}\nDPI: ${echolog.DPI}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory(GB): ${echolog.memory}\nLangs: ${echolog.systemLanguages}`,
           };
-          // This is a lazy way of doing it, having
-          // your webhook url out in the open like
-          // this is a bad idea, you should instead
-          // have it contact a internal API to
-          // forward the request.
-          fetch("https://discord.com/api/webhooks/1428808614918750379/rujdaVb0z0gkD4eoOlPtoKvgXDdeADyAWUdWH28be5iGFBeFQMy548l1mc_VTTElZbZJ", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          })
-            .then((response) => console.log(response))
-            .catch((error) => console.error(error));
+
+          // === SAFETY CHANGE: NO DIRECT DISCORD WEBHOOK CALLS FROM CLIENT-SIDE ===
+          // The previous code sent `payload` directly to a Discord webhook URL. That made the URL public
+          // and allowed attackers to spam it. This static-only file removes any direct network POST to Discord.
+          //
+          // Instead: we do the strongest protections possible strictly in static HTML+JS:
+          //  - client-side honeypot + browser fingerprint
+          //  - per-browser rate-limiting (localStorage)
+          //  - exponential backoff on repeated attempts
+          //  - small interactive challenge (simple math) to raise bot cost
+          //  - provide a local-only method to inspect/copy/download the payload (no network call)
+          //
+          // IMPORTANT: these client-side protections can be bypassed by determined attackers,
+          // but they raise the cost for automated noise and completely remove the leaked secret
+          // from the published HTML (the webhook URL must NOT be present anywhere in this file).
+
+          (function handlePayloadLocally(pl) {
+            // --- Configuration ---
+            const LS_LAST = 'sc_last_sent_v1'; // timestamp of last successful action
+            const LS_ATTEMPTS = 'sc_attempts_v1'; // count of attempts (used for backoff)
+            const MIN_SECONDS_BETWEEN = 30; // per-browser minimum seconds between allowed attempts
+            const THRESHOLD = 3; // attempts before backoff begins
+            const BACKOFF_BASE = 60; // base seconds for backoff exponent
+
+            // UI elements
+            const statusMsg = document.getElementById('statusMsg');
+            const payloadBox = document.getElementById('payloadBox');
+            const payloadActions = document.getElementById('payloadActions');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const clearBtn = document.getElementById('clearBtn');
+
+            const challengeEl = document.getElementById('challenge');
+            const qtext = document.getElementById('qtext');
+            const qans = document.getElementById('qans');
+            const qsubmit = document.getElementById('qsubmit');
+            const qcancel = document.getElementById('qcancel');
+
+            function nowSec() { return Math.floor(Date.now() / 1000); }
+            function getLast() { try { return parseInt(localStorage.getItem(LS_LAST) || '0', 10); } catch(e){ return 0; } }
+            function setLast(v) { try { localStorage.setItem(LS_LAST, String(v)); } catch(e){} }
+            function getAttempts() { try { return parseInt(localStorage.getItem(LS_ATTEMPTS) || '0', 10); } catch(e){ return 0; } }
+            function setAttempts(n) { try { localStorage.setItem(LS_ATTEMPTS, String(n)); } catch(e){} }
+
+            function computeBackoff(attempts) {
+              if (attempts <= THRESHOLD) return 0;
+              const extra = attempts - THRESHOLD;
+              return BACKOFF_BASE * Math.pow(2, Math.min(extra, 8)); // cap exponent reasonably
+            }
+
+            // tiny fingerprint for heuristics (not perfect)
+            function fingerprint() {
+              try {
+                return btoa((navigator.userAgent || '') + '|' + screen.width + 'x' + screen.height).slice(0, 32);
+              } catch(e) { return 'fp-unknown'; }
+            }
+
+            // honeypot: if a global variable or element expected by bots exists, block
+            try {
+              if (window.webhook_honeypot && String(window.webhook_honeypot).length > 0) {
+                statusMsg.textContent = 'Honeypot triggered; no action taken.';
+                return;
+              }
+            } catch (e) {}
+
+            // rate/backoff checks
+            const last = getLast();
+            const attempts = getAttempts();
+            const backoff = computeBackoff(attempts);
+            const now = nowSec();
+            if (now - last < MIN_SECONDS_BETWEEN) {
+              setAttempts(attempts + 1);
+              statusMsg.textContent = `Client-side rate limit: wait ${MIN_SECONDS_BETWEEN - (now - last)}s before trying again.`;
+              return;
+            }
+            if (backoff > 0 && now < last + backoff) {
+              setAttempts(attempts + 1);
+              const rem = (last + backoff) - now;
+              statusMsg.textContent = `Client-side backoff active. Try again in ${rem}s.`;
+              return;
+            }
+
+            // Prepare display-friendly payload and store a local copy (never sent)
+            const safePayloadJson = JSON.stringify({
+              payload: pl,
+              client_fp: fingerprint(),
+              ts: new Date().toISOString()
+            }, null, 2);
+
+            // Save locally (so user/admin can inspect even offline)
+            try { localStorage.setItem('sc_last_payload', safePayloadJson); } catch(e){}
+
+            // show small interactive challenge (simple math)
+            let a = Math.floor(Math.random() * 10) + 1;
+            let b = Math.floor(Math.random() * 10) + 1;
+            qtext.textContent = `${a} + ${b} = ?`;
+            qans.value = '';
+            challengeEl.style.display = 'block';
+            challengeEl.setAttribute('aria-hidden','false');
+            statusMsg.textContent = 'Complete the quick challenge to unlock the local payload inspector.';
+
+            function unlockIfCorrect() {
+              const user = (qans.value || '').trim();
+              if (user === String(a + b)) {
+                challengeEl.style.display = 'none';
+                challengeEl.setAttribute('aria-hidden','true');
+                statusMsg.textContent = 'Payload prepared locally. No network call to Discord is made from this page.';
+                payloadBox.textContent = safePayloadJson;
+                payloadBox.style.display = 'block';
+                payloadBox.setAttribute('aria-hidden','false');
+                payloadActions.style.display = 'block';
+                payloadActions.setAttribute('aria-hidden','false');
+
+                // update rate/backoff state as a successful local inspect
+                setLast(nowSec());
+                setAttempts(attempts + 1);
+              } else {
+                setAttempts(attempts + 1);
+                statusMsg.textContent = 'Incorrect answer. Try again later.';
+                // brief lockout
+                setTimeout(() => {
+                  challengeEl.style.display = 'none';
+                  challengeEl.setAttribute('aria-hidden','true');
+                }, 2000);
+              }
+            }
+
+            qsubmit.addEventListener('click', unlockIfCorrect);
+            qans.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ unlockIfCorrect(); }});
+            qcancel.addEventListener('click', function(){
+              challengeEl.style.display = 'none';
+              challengeEl.setAttribute('aria-hidden','true');
+              statusMsg.textContent = 'Cancelled. Payload remains local.';
+            });
+
+            // copy/download/clear actions (local only)
+            copyBtn.addEventListener('click', function(){
+              try {
+                navigator.clipboard.writeText(payloadBox.textContent).then(function(){
+                  statusMsg.textContent = 'Payload copied to clipboard. Paste it where you control the webhook (server or forwarding service).';
+                }, function(){
+                  statusMsg.textContent = 'Copy failed (clipboard permission); you can download the payload instead.';
+                });
+              } catch(e){
+                statusMsg.textContent = 'Copy not supported in this browser.';
+              }
+            });
+
+            downloadBtn.addEventListener('click', function(){
+              const blob = new Blob([payloadBox.textContent], {type: 'application/json'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'payload.json';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+              statusMsg.textContent = 'Payload downloaded. Do not commit webhook URLs into your public site.';
+            });
+
+            clearBtn.addEventListener('click', function(){
+              try {
+                localStorage.removeItem('sc_last_payload');
+                statusMsg.textContent = 'Local payload cleared.';
+                payloadBox.textContent = '';
+                payloadBox.style.display = 'none';
+                payloadActions.style.display = 'none';
+              } catch(e){
+                statusMsg.textContent = 'Failed to clear local payload.';
+              }
+            });
+
+            // If a saved payload already exists from prior run, inform the user
+            try {
+              const prev = localStorage.getItem('sc_last_payload');
+              if (prev && prev.length > 0) {
+                statusMsg.textContent = 'A previously prepared payload exists locally. Complete the challenge to view it.';
+                // show but keep locked behind challenge
+              }
+            } catch(e){}
+          })(payload);
+
         })
         .catch((error) => console.error(error));
     </script>
