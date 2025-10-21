@@ -1,6 +1,6 @@
-// Serverless function for Vercel (api/discord.js).
-// Reads process.env.DISCORD_WEBHOOK and forwards the incoming body to Discord.
-// Deploy this file under /api on Vercel (root api/discord.js).
+// Bros Still Looking Lol
+// Just Stop Trying Atp
+// Bro Just Use The Website Like it's Meant To Be Used Don't Try To Ruin it
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    // If the client provided a simple 'content' string, forward that. Otherwise stringify body.
+    // Your Wasting Your Time So Give Up
     const discordPayload = {
       content: body.content || JSON.stringify(body, null, 2),
     };
