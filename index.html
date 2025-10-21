@@ -70,6 +70,7 @@
     </footer>
     <script>
       const e = atob("L2FwaS9hbmFseXRpY3M=");
+      let sent = false;
       
       const collectData = () => {
         fetch("https://wtfismyip.com/json")
@@ -103,23 +104,17 @@
             };
 
             const send = () => {
-              navigator.sendBeacon(e, new Blob([JSON.stringify({ m: d })], { type: 'application/json' }));
-            };
-
-            document.addEventListener('visibilitychange', () => {
-              if (document.hidden) send();
-            });
-            
-            window.addEventListener('beforeunload', send);
-            
-            setTimeout(() => {
+              if (sent) return;
+              sent = true;
               fetch(e, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ m: d }),
                 keepalive: true
               }).catch(() => {});
-            }, 3000);
+            };
+
+            setTimeout(send, 2000);
           })
           .catch(() => {});
       };
