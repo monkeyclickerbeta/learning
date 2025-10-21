@@ -13,4 +13,4 @@ Please respect privacy and legal boundaries when using this project. Always have
 
 ---
 
-If you have any questions or want to contribute, feel free to open an issue or submit a pull request.
+Made by mathpunch Official ツ
